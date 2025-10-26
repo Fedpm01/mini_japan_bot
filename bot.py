@@ -3,6 +3,10 @@
 # Requirements: aiogram, APScheduler, python-dotenv
 # pip install aiogram==2.25.1 APScheduler python-dotenv
 
+#!/usr/bin/env python3
+# Mini Japan Telegram Bot (updated)
+# Requirements: aiogram (v3), aiohttp, APScheduler, python-dotenv
+
 import asyncio
 import os
 import json
@@ -11,6 +15,7 @@ import logging
 import aiohttp
 import csv
 import io
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -34,12 +39,16 @@ SUBS_PATH = os.path.join(os.path.dirname(__file__), "subscribers.json")
 
 # --- Глобальные переменные ---
 data = {"words": [], "facts": [], "proverbs": []}
-jlpt_data = {}
+jlpt_data = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
 
-# --- URL для загрузки ---
+# --- URL для загрузки (проверь, что файлы действительно есть в этих местах) ---
 CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/data.csv"
-JLPT_BASE = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/data"
-
+JLPT_FILES = [
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_3.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_4.json",
+]
 
 # --- Работа с подписками ---
 def load_subs():
@@ -53,80 +62,85 @@ def save_subs(d):
     with open(SUBS_PATH, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
-
-# --- Загрузка данных ---
-# --- JLPT из AnchorI ---
-JLPT_FILES = [
-    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
-    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
-    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_3.json",
-    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_4.json",
-]
-
+# --- Загрузка JLPT (с частями) ---
 async def load_jlpt_data():
-    """Загружает все части JLPT словаря и сортирует по уровням"""
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
     async with aiohttp.ClientSession() as session:
         for url in JLPT_FILES:
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    text = await resp.text()  # читаем как текст
-                    try:
-                        part = json.loads(text)  # парсим вручную
-                    except json.JSONDecodeError:
-                        print(f"⚠️ Ошибка парсинга JSON в {url}")
-                        continue
+            try:
+                async with session.get(url, timeout=30) as resp:
+                    if resp.status == 200:
+                        text = await resp.text()
+                        try:
+                            part = json.loads(text)
+                        except json.JSONDecodeError:
+                            print(f"⚠️ Ошибка парсинга JSON из {url}")
+                            continue
 
-                    for item in part:
-                        level = item.get("jlpt", "").upper()
-                        if level in grouped:
-                            grouped[level].append({
-                                "kanji": item.get("kanji") or item.get("word") or "",
-                                "reading": item.get("reading") or item.get("kana") or "",
-                                "translation": {
-                                    "en": item.get("meaning") or "",
-                                    "ru": item.get("meaning_ru") or "",
-                                },
-                            })
-                    print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
-                else:
-                    print(f"⚠️ Failed to load {url} ({resp.status})")
-
-    print("📊 Итоговая структура:", {k: len(v) for k, v in grouped.items()})
+                        # Внутри part — список слов; у каждого есть поле "jlpt"
+                        for item in part:
+                            level = str(item.get("jlpt", "")).upper()
+                            if level in grouped:
+                                grouped[level].append({
+                                    "kanji": item.get("kanji") or item.get("word") or "",
+                                    "reading": item.get("reading") or item.get("kana") or "",
+                                    "translation": {
+                                        "en": item.get("meaning") or item.get("english") or "",
+                                        "ru": item.get("meaning_ru") or item.get("russian") or "",
+                                    },
+                                })
+                        print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
+                    else:
+                        print(f"⚠️ {url} returned {resp.status}")
+            except Exception as e:
+                print(f"⚠️ Exception while loading {url}: {e}")
+    print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
     return grouped
 
-
-
+# --- Загрузка CSV контента из GitHub ---
 async def load_data_from_github():
-    """Загрузка CSV контента из GitHub"""
     async with aiohttp.ClientSession() as session:
-        async with session.get(CSV_URL) as resp:
-            text = await resp.text()
-            reader = csv.DictReader(io.StringIO(text))
-            data_map = {"words": [], "facts": [], "proverbs": []}
-            for row in reader:
-                cat = row.get("category", "").strip().lower()
-                if cat == "fact":
-                    data_map["facts"].append(row)
-                elif cat == "proverb":
-                    data_map["proverbs"].append(row)
-                else:
-                    data_map["words"].append(row)
-            return data_map
-
+        try:
+            async with session.get(CSV_URL, timeout=30) as resp:
+                if resp.status != 200:
+                    print(f"⚠️ CSV URL returned {resp.status}: {CSV_URL}")
+                    return {"words": [], "facts": [], "proverbs": []}
+                text = await resp.text()
+                reader = csv.DictReader(io.StringIO(text))
+                data_map = {"words": [], "facts": [], "proverbs": []}
+                for row in reader:
+                    cat = (row.get("category") or "").strip().lower()
+                    if cat == "fact":
+                        data_map["facts"].append(row)
+                    elif cat == "proverb":
+                        data_map["proverbs"].append(row)
+                    else:
+                        data_map["words"].append(row)
+                return data_map
+        except Exception as e:
+            print("⚠️ Exception while loading CSV:", e)
+            return {"words": [], "facts": [], "proverbs": []}
 
 # --- Форматирование сообщений ---
 def format_word(item, lang="ru"):
-    trans = item.get(lang, "")
-    return f"{item.get('emoji','')} <b>{item.get('ja')}</b> ({item.get('reading')})\n{trans}"
+    # handle both CSV row format and JLPT item format
+    if "translation" in item:
+        # JLPT item
+        emoji = "📘"
+        ja = item.get("kanji","")
+        reading = item.get("reading","")
+        trans = item["translation"].get(lang, "") if isinstance(item.get("translation"), dict) else item.get(lang,"")
+        return f"{emoji} <b>{ja}</b> ({reading})\n{trans}"
+    else:
+        # CSV row
+        trans = item.get(lang, "")
+        return f"{item.get('emoji','')} <b>{item.get('ja','')}</b> ({item.get('reading','')})\n{trans}"
 
 def format_fact(item, lang="ru"):
     return f"{item.get('emoji','')} {item.get(lang,'')}"
 
 def format_proverb(item, lang="ru"):
-    trans = item.get(lang, "")
-    return f"{item.get('emoji','')} <b>{item.get('ja')}</b> ({item.get('reading')})\n{trans}"
-
+    return f"{item.get('emoji','')} {item.get(lang,'')}"
 
 # --- Команды ---
 @dp.message(Command("start"))
@@ -137,7 +151,6 @@ async def cmd_start(message: Message):
     ])
     await message.answer("Konnichiwa! 👋\nВыберите язык / Choose language:", reply_markup=kb)
 
-
 @dp.callback_query(F.data.startswith("lang_"))
 async def process_lang(call: CallbackQuery):
     lang = call.data.split("_", 1)[1]
@@ -147,7 +160,7 @@ async def process_lang(call: CallbackQuery):
     save_subs(subs)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Слово дня / Word of the day", callback_data="word"),
+        [InlineKeyboardButton(text="Слово дня / Word of the day", callback_data="daily"),
          InlineKeyboardButton(text="Факт / Fact", callback_data="fact")],
         [InlineKeyboardButton(text="Пословица / Proverb", callback_data="proverb"),
          InlineKeyboardButton(text="📘 JLPT Vocabulary", callback_data="jlpt")],
@@ -156,7 +169,6 @@ async def process_lang(call: CallbackQuery):
     await call.message.answer("Отлично! 🌸 Я покажу японские слова и факты!", reply_markup=kb)
     await call.answer()
 
-
 @dp.callback_query(F.data.in_({"word", "fact", "proverb", "toggle_sub"}))
 async def inline_actions(call: CallbackQuery):
     user_id = str(call.from_user.id)
@@ -164,14 +176,26 @@ async def inline_actions(call: CallbackQuery):
     user_lang = subs.get(user_id, {}).get("lang", "ru")
 
     if call.data == "word":
+        if not data["words"]:
+            await call.message.answer("⏳ Данные пока не загружены. Попробуйте чуть позже.")
+            await call.answer()
+            return
         item = random.choice(data["words"])
         await call.message.answer(format_word(item, lang=user_lang), parse_mode="HTML")
 
     elif call.data == "fact":
+        if not data["facts"]:
+            await call.message.answer("⏳ Факты пока не загружены.")
+            await call.answer()
+            return
         item = random.choice(data["facts"])
         await call.message.answer(format_fact(item, lang=user_lang))
 
     elif call.data == "proverb":
+        if not data["proverbs"]:
+            await call.message.answer("⏳ Пословицы пока не загружены.")
+            await call.answer()
+            return
         item = random.choice(data["proverbs"])
         await call.message.answer(format_proverb(item, lang=user_lang), parse_mode="HTML")
 
@@ -181,7 +205,6 @@ async def inline_actions(call: CallbackQuery):
         save_subs(subs)
         await call.message.answer("Подписка обновлена: " + ("✅ Включена" if not cur else "❌ Выключена"))
     await call.answer()
-
 
 # --- JLPT меню ---
 @dp.callback_query(F.data == "jlpt")
@@ -197,16 +220,23 @@ async def choose_jlpt_level(call: CallbackQuery):
     await call.message.answer("Выберите уровень JLPT:", reply_markup=kb)
     await call.answer()
 
-
 @dp.callback_query(F.data.startswith("jlpt_N"))
 async def send_jlpt_word(call: CallbackQuery):
     level = call.data.split("_")[1]
+    # guard: jlpt_data may be empty while loading
+    if not any(len(v) for v in jlpt_data.values()):
+        await call.message.answer("⏳ JLPT-данные ещё загружаются. Попробуйте через минуту.")
+        await call.answer()
+        return
+
     words = jlpt_data.get(level, [])
     if not words:
         await call.message.answer(f"⚠️ Нет данных для уровня {level}.")
+        await call.answer()
         return
+
     word = random.choice(words)
-    ja = word.get("kanji") or word.get("word") or ""
+    ja = word.get("kanji") or ""
     reading = word.get("reading") or ""
     en = word.get("translation", {}).get("en", "")
     ru = word.get("translation", {}).get("ru", "")
@@ -216,19 +246,19 @@ async def send_jlpt_word(call: CallbackQuery):
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
-
 # --- Ежедневная рассылка ---
 async def daily_broadcast(bot: Bot):
     subs = load_subs()
     for uid, info in subs.items():
         if info.get("subscribed"):
             lang = info.get("lang", "ru")
+            if not data["words"]:
+                continue
             item = random.choice(data["words"])
             try:
                 await bot.send_message(int(uid), format_word(item, lang=lang), parse_mode="HTML")
             except Exception as e:
                 print("Send failed to", uid, e)
-
 
 # --- Обновление данных раз в сутки ---
 async def refresh_data():
@@ -237,7 +267,6 @@ async def refresh_data():
     data = await load_data_from_github()
     print("✅ Data updated!")
 
-
 # --- Планировщик ---
 def setup_scheduler():
     scheduler.add_job(lambda: asyncio.create_task(daily_broadcast(bot)), "cron", hour=9, minute=0)
@@ -245,18 +274,25 @@ def setup_scheduler():
     scheduler.start()
     print("✅ Scheduler started!")
 
-
 # --- Основная функция ---
 async def main():
     global data, jlpt_data
     print("🚀 Bot starting...")
-    data = await load_data_from_github()
-    jlpt_data = await load_jlpt_data()
-    print(f"📊 Итоговая структура: { {k: len(v) for k,v in jlpt_data.items()} }")
-    print(f"✅ CSV: {len(data['words'])} words, {len(data['facts'])} facts, {len(data['proverbs'])} proverbs")
+
+    # Загрузка CSV и JLPT (делаем параллельно)
+    try:
+        data_task = asyncio.create_task(load_data_from_github())
+        jlpt_task = asyncio.create_task(load_jlpt_data())
+        data = await data_task
+        jlpt_data = await jlpt_task
+    except Exception as e:
+        print("⚠️ Error during initial load:", e)
+
+    print(f"📊 JLPT totals: { {k: len(v) for k, v in jlpt_data.items()} }")
+    print(f"✅ CSV: {len(data.get('words',[]))} words, {len(data.get('facts',[]))} facts, {len(data.get('proverbs',[]))} proverbs")
+
     setup_scheduler()
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

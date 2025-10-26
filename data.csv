@@ -1,37 +1,37 @@
 category,emoji,ja,reading,ru,en
-food,🥪,roasted たまご,roasted-tamago [roasted-tamago],тамаго (roasted),egg (roasted)
-food,🍡,roasted 抹茶,roasted-matcha [roasted-matcha],маття (roasted),matcha (roasted)
-food,🍣,照り焼き,teriyaki [teriyaki],тэриёки,teriyaki
-food,🍙,照り焼き,teriyaki [teriyaki],тэриёки,teriyaki
-food,🍮,抹茶,matcha [matcha],маття,matcha
-food,🍘,牛丼,gyuudon [gyudon],гюдон,gyudon
-food,🥟,steamed ご飯,steamed-gohan [steamed-gohan],гохан (steamed),rice (steamed)
-food,🥘,fresh たこ焼き,fresh-takoyaki [fresh-takoyaki],такояки (fresh),takoyaki (fresh)
-food,🍡,fried おにぎり,fried-onigiri [fried-onigiri],онигири (fried),onigiri (fried)
-food,🍵,with_sauce おにぎり,with_sauce-onigiri [with_sauce-onigiri],онигири (with_sauce),onigiri (with_sauce)
-food,🍡,grilled たこ焼き,grilled-takoyaki [grilled-takoyaki],такояки (grilled),takoyaki (grilled)
-food,🥪,sweet 抹茶,sweet-matcha [swet-matcha],маття (sweet),matcha (sweet)
-food,🍵,cold 味噌汁,cold-misoshiru [cold-misoshiru],мисосиру (cold),miso soup (cold)
-food,🍵,steamed ラーメン,steamed-raamen [steamed-ramen],ра́мен (steamed),ramen (steamed)
-food,🥪,grilled ラーメン,grilled-raamen [grilled-ramen],ра́мен (grilled),ramen (grilled)
-food,🍩,ご飯,gohan [gohan],гохан,rice
+food,🥪,焼き たまご,yaki-tamago [yaki-tamago],жареное яйцо,fried egg
+food,🍡,roasted 抹茶,roasted-matcha [roasted-matcha],маттча (roasted),matcha (roasted)
+food,🍣,照り焼き,teriyaki [teriyaki], терияки,teriyaki
+food,🍙,照り焼き,teriyaki [teriyaki], терияки,teriyaki
+food,🍮,抹茶,matcha [matcha],маттча ,matcha
+food,🍘,牛丼,gyuudon [gyudon],гюдон(миска говядины),gyudon
+food,🥟,steamed ご飯,steamed-gohan [steamed-gohan],пропаренный рис,rice (steamed)
+food,🥘,できたてのたこ焼き,deki-tate no takoyaki [fresh-takoyaki],такояки (fresh),takoyaki (fresh)
+food,🍡,焼きおにぎり,yaki-onigiri [fried-onigiri],жареные рисовые шарики,onigiri (fried)
+food,🍵,ソース付きおにぎり,with_sauce-onigiri [with_sauce-onigiri],онигири с соусом,onigiri with sauce
+food,🍡,揚げたこ焼き,age takoyaki [grilled-takoyaki],жареные такояки,takoyaki grilled
+food,🥪,甘い抹茶,amai-matcha,cладкий матча,swet-matcha
+food,🍵,冷たい味噌汁, tsumetai misoshiru ,холодный суп мисо,cold-misoshiru
+food,🥘,蒸しラーメン,mushi-raamen,рамен на пару,steamed-ramen
+food,🥪,焼きラーメン,yaki raamen,жареный рамен,ramen (grilled)
+food,🍩,ご飯,gohan [gohan],рис,rice
 food,🥮,牛丼,gyuudon [gyudon],гюдон,gyudon
-food,🥘,steamed ラーメン,steamed-raamen [steamed-ramen],ра́мен (steamed),ramen (steamed)
-food,🍶,with_sauce 刺身,with_sauce-sashimi [with_sauce-sashimi],сашими (with_sauce),sashimi (with_sauce)
+food,🥘,蒸しラーメン,mushi-raamen,рамен на пару,steamed-ramen
+food,🍶,刺身のタレ,sashimi no tare,соус для сашими,sashimi sauce
 food,🍰,そば,soba [soba],соба,soba
-food,🍶,spicy そば,spicy-soba [spicy-soba],соба (spicy),soba (spicy)
+food,🍶,辛いそば,tsurai soba,острая лапша соба,spicy-soba
 food,🍮,刺身,sashimi [sashimi],сашими,sashimi
-food,🍜,cold 抹茶,cold-matcha [cold-matcha],маття (cold),matcha (cold)
-food,🍢,sweet そば,sweet-soba [swet-soba],соба (sweet),soba (sweet)
-food,🥘,steamed うどん,steamed-udon [steamed-udon],удон (steamed),udon (steamed)
-food,🍜,with_sauce ご飯,with_sauce-gohan [with_sauce-gohan],гохан (with_sauce),rice (with_sauce)
+food,🍜,冷たい抹茶,tsumetai matcha,холодный матча,cold matcha
+food,🍢,甘い そば,amai soba,сладкая соба, sweet soba
+food,🥘,蒸しうどん,mushi -udon,удон на пару,steamed udon
+food,🍜,ソース付きご飯,soosu tsuki gohan,рис с соусом,rice with sauce
 food,🍡,刺身,sashimi [sashimi],сашими,sashimi
 food,🍶,和菓子,wagashi [wagashi],вагаси,wagashi
-food,🍱,fried うどん,fried-udon [fried-udon],удон (fried),udon (fried)
-food,🥪,spicy お好み焼き,spicy-okonomiyaki [spicy-okonomiyaki],okonomiyaki (spicy),okonomiyaki (spicy)
-food,🥘,roasted ラーメン,roasted-raamen [roasted-ramen],ра́мен (roasted),ramen (roasted)
-food,🥟,sweet 和菓子,sweet-wagashi [swet-wagashi],вагаси (sweet),wagashi (sweet)
-food,🧋,with_sauce お弁当,with_sauce-obento [with_sauce-obento],обэнто (with_sauce),bento (with_sauce)
+food,🍱,焼きうどん,yakiudon,жареный удон,fried udon
+food,🥪,スパイシ お好み焼き,supaishi-okonomiyaki,острые окономияки,spicy okonomiyaki
+food,🥘,焼きラーメン,yaki-raamen,жареный рамен,roasted ramen
+food,🥟,甘い和菓子,amai-wagashi,сладкий вагаси, sweet wagashi
+food,🧋,ソース付き弁当,Sōsu-tsuki bentō,Бенто с соусом,bento with sauce
 food,🍵,味噌汁,misoshiru [misoshiru],мисосиру,miso soup
 food,🍛,牛丼,gyuudon [gyudon],гюдон,gyudon
 food,🍮,cold 寿司,cold-sushi [cold-sushi],суши (cold),sushi (cold)
@@ -53,12 +53,12 @@ food,🍙,たまご,tamago [tamago],тамаго,egg
 food,🍶,カレー,karee [kare],карэ,curry
 food,🥘,sweet うどん,sweet-udon [swet-udon],удон (sweet),udon (sweet)
 food,🍰,grilled 焼き鳥,grilled-yakitori [grilled-yakitori],якитори (grilled),yakitori (grilled)
-food,🍩,たまご,tamago [tamago],тамаго,egg
+food,🍩,たまご,tamago [tamago],яйцо,egg
 food,🍰,spicy たまご,spicy-tamago [spicy-tamago],тамаго (spicy),egg (spicy)
 food,🍡,with_sauce 焼き鳥,with_sauce-yakitori [with_sauce-yakitori],якитори (with_sauce),yakitori (with_sauce)
-food,🍩,mini 抹茶,mini-matcha [mini-matcha],маття (mini),matcha (mini)
+food,🍩,mini 抹茶,mini-matcha [mini-matcha],матча (mini),matcha (mini)
 food,🥢,sweet お好み焼き,sweet-okonomiyaki [swet-okonomiyaki],okonomiyaki (sweet),okonomiyaki (sweet)
-food,🍩,餃子,gyoza [gyoza],гёдза,gyoza
+food,🍩,餃子,gyoza [gyoza],гёдза(китайские пельмени),gyoza
 food,🍶,cold うどん,cold-udon [cold-udon],удон (cold),udon (cold)
 food,🍶,steamed 寿司,steamed-sushi [steamed-sushi],суши (steamed),sushi (steamed)
 food,🍜,cold 刺身,cold-sashimi [cold-sashimi],сашими (cold),sashimi (cold)
@@ -96,11 +96,11 @@ food,🍘,grilled おにぎり,grilled-onigiri [grilled-onigiri],онигири 
 food,🥪,grilled ラーメン,grilled-raamen [grilled-ramen],ра́мен (grilled),ramen (grilled)
 food,🥟,fresh 焼き鳥,fresh-yakitori [fresh-yakitori],якитори (fresh),yakitori (fresh)
 food,🍢,sweet うどん,sweet-udon [swet-udon],удон (sweet),udon (sweet)
-food,🥪,抹茶,matcha [matcha],маття,matcha
+food,🥪,抹茶,matcha [matcha],матча,matcha
 food,🍜,たまご,tamago [tamago],тамаго,egg
 food,🍵,和菓子,wagashi [wagashi],вагаси,wagashi
 food,🍙,そば,soba [soba],соба,soba
-food,🍰,照り焼き,teriyaki [teriyaki],тэриёки,teriyaki
+food,🍰,照り焼き,teriyaki [teriyaki],тэрияки,teriyaki
 food,🍰,ご飯,gohan [gohan],гохан,rice
 food,🍱,fried 餃子,fried-gyoza [fried-gyoza],гёдза (fried),gyoza (fried)
 food,🥮,sweet たまご,sweet-tamago [swet-tamago],тамаго (sweet),egg (sweet)
