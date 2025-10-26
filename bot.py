@@ -56,31 +56,39 @@ def save_subs(d):
 
 # --- Загрузка данных ---
 # --- URL GitHub JSON ---
+# --- JLPT из AnchorI ---
+JLPT_FILES = [
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_3.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_4.json",
+]
+
 async def load_jlpt_data():
-    levels = ["N5", "N4", "N3", "N2", "N1"]
-    grouped = {lvl: [] for lvl in levels}
+    """Загружает все части JLPT словаря и сортирует по уровням"""
+    grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
     async with aiohttp.ClientSession() as session:
-        for lvl in levels:
-            url = f"{JLPT_BASE}/{lvl}.json"
+        for url in JLPT_FILES:
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    items = await resp.json()
-                    grouped[lvl] = [
-                        {
-                            "kanji": i.get("kanji") or i.get("word") or "",
-                            "reading": i.get("reading") or i.get("kana") or "",
-                            "translation": {
-                                "en": i.get("meaning") or "",
-                                "ru": i.get("meaning_ru") or "",
-                            },
-                        }
-                        for i in items
-                    ]
-                    print(f"✅ {lvl} loaded: {len(grouped[lvl])} words")
+                    part = await resp.json()
+                    for item in part:
+                        level = item.get("jlpt", "").upper()
+                        if level in grouped:
+                            grouped[level].append({
+                                "kanji": item.get("kanji") or item.get("word") or "",
+                                "reading": item.get("reading") or item.get("kana") or "",
+                                "translation": {
+                                    "en": item.get("meaning") or "",
+                                    "ru": item.get("meaning_ru") or "",
+                                },
+                            })
+                    print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
                 else:
-                    print(f"⚠️ {lvl} not found ({resp.status})")
-    return grouped
+                    print(f"⚠️ Failed to load {url} ({resp.status})")
 
+    print("📊 Итоговая структура:", {k: len(v) for k, v in grouped.items()})
+    return grouped
 
 
 
