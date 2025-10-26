@@ -37,8 +37,8 @@ data = {"words": [], "facts": [], "proverbs": []}
 jlpt_data = {}
 
 # --- URL для загрузки ---
-CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/main/data.csv"
-JLPT_URL = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary.json"
+CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/data.csv"
+JLPT_BASE = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/data"
 
 
 # --- Работа с подписками ---
@@ -55,39 +55,32 @@ def save_subs(d):
 
 
 # --- Загрузка данных ---
+# --- URL GitHub JSON ---
 async def load_jlpt_data():
+    levels = ["N5", "N4", "N3", "N2", "N1"]
+    grouped = {lvl: [] for lvl in levels}
     async with aiohttp.ClientSession() as session:
-        async with session.get(JLPT_URL) as resp:
-            if resp.status == 200:
-                all_items = await resp.json()
-                print(f"🔍 Всего элементов в JLPT: {len(all_items)}")
-
-                # Иногда в репозитории файл — словарь, иногда — список
-                if isinstance(all_items, dict):
-                    all_items = all_items.get("data", all_items.get("words", []))
-
-                grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
-
-                for item in all_items:
-                    level = str(item.get("level", "")).upper()
-                    if level in grouped:
-                        grouped[level].append({
-                            "kanji": item.get("kanji") or item.get("word") or "",
-                            "reading": item.get("reading") or item.get("kana") or "",
+        for lvl in levels:
+            url = f"{JLPT_BASE}/{lvl}.json"
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    items = await resp.json()
+                    grouped[lvl] = [
+                        {
+                            "kanji": i.get("kanji") or i.get("word") or "",
+                            "reading": i.get("reading") or i.get("kana") or "",
                             "translation": {
-                                "en": item.get("meaning_en") or item.get("english") or "",
-                                "ru": item.get("meaning_ru") or item.get("russian") or ""
-                            }
-                        })
+                                "en": i.get("meaning") or "",
+                                "ru": i.get("meaning_ru") or "",
+                            },
+                        }
+                        for i in items
+                    ]
+                    print(f"✅ {lvl} loaded: {len(grouped[lvl])} words")
+                else:
+                    print(f"⚠️ {lvl} not found ({resp.status})")
+    return grouped
 
-                print("✅ Загружено:")
-                for lvl, items in grouped.items():
-                    print(f"   {lvl}: {len(items)} слов")
-
-                return grouped
-            else:
-                print(f"⚠️ Ошибка при загрузке JLPT (status {resp.status})")
-                return {}
 
 
 
