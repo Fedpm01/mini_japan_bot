@@ -60,16 +60,35 @@ async def load_jlpt_data():
         async with session.get(JLPT_URL) as resp:
             if resp.status == 200:
                 all_items = await resp.json()
+                print(f"🔍 Всего элементов в JLPT: {len(all_items)}")
+
+                # Иногда в репозитории файл — словарь, иногда — список
+                if isinstance(all_items, dict):
+                    all_items = all_items.get("data", all_items.get("words", []))
+
                 grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
+
                 for item in all_items:
-                    level = item.get("level", "").upper()
+                    level = str(item.get("level", "")).upper()
                     if level in grouped:
-                        grouped[level].append(item)
-                print(f"✅ JLPT data loaded! N5={len(grouped['N5'])}, N1={len(grouped['N1'])}")
+                        grouped[level].append({
+                            "kanji": item.get("kanji") or item.get("word") or "",
+                            "reading": item.get("reading") or item.get("kana") or "",
+                            "translation": {
+                                "en": item.get("meaning_en") or item.get("english") or "",
+                                "ru": item.get("meaning_ru") or item.get("russian") or ""
+                            }
+                        })
+
+                print("✅ Загружено:")
+                for lvl, items in grouped.items():
+                    print(f"   {lvl}: {len(items)} слов")
+
                 return grouped
             else:
-                print(f"⚠️ Failed to load JLPT data (status {resp.status})")
+                print(f"⚠️ Ошибка при загрузке JLPT (status {resp.status})")
                 return {}
+
 
 
 async def load_data_from_github():
@@ -227,6 +246,7 @@ async def main():
     print("🚀 Bot starting...")
     data = await load_data_from_github()
     jlpt_data = await load_jlpt_data()
+    print(f"📊 Итоговая структура: { {k: len(v) for k,v in jlpt_data.items()} }")
     print(f"✅ CSV: {len(data['words'])} words, {len(data['facts'])} facts, {len(data['proverbs'])} proverbs")
     setup_scheduler()
     await dp.start_polling(bot)
