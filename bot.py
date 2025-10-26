@@ -42,7 +42,7 @@ data = {"words": [], "facts": [], "proverbs": []}
 jlpt_data = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
 
 # --- URL для загрузки (проверь, что файлы действительно есть в этих местах) ---
-CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/data.csv"
+CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/main/data.csv"
 JLPT_FILES = [
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
@@ -79,7 +79,12 @@ async def load_jlpt_data():
 
                         # Внутри part — список слов; у каждого есть поле "jlpt"
                         for item in part:
-                            level = str(item.get("jlpt", "")).upper()
+                            # пробуем несколько вариантов поля уровня
+                            level = (
+                                str(item.get("jlpt") or item.get("jlpt_level") or item.get("level") or "")
+                                .upper()
+                                .replace("JLPT", "")
+                            )
                             if level in grouped:
                                 grouped[level].append({
                                     "kanji": item.get("kanji") or item.get("word") or "",
@@ -89,6 +94,7 @@ async def load_jlpt_data():
                                         "ru": item.get("meaning_ru") or item.get("russian") or "",
                                     },
                                 })
+
                         print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
                     else:
                         print(f"⚠️ {url} returned {resp.status}")
