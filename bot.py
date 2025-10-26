@@ -59,12 +59,18 @@ async def load_jlpt_data():
     async with aiohttp.ClientSession() as session:
         async with session.get(JLPT_URL) as resp:
             if resp.status == 200:
-                data = await resp.json()
-                print("✅ JLPT data loaded successfully!")
-                return data
+                all_items = await resp.json()
+                grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
+                for item in all_items:
+                    level = item.get("level", "").upper()
+                    if level in grouped:
+                        grouped[level].append(item)
+                print(f"✅ JLPT data loaded! N5={len(grouped['N5'])}, N1={len(grouped['N1'])}")
+                return grouped
             else:
                 print(f"⚠️ Failed to load JLPT data (status {resp.status})")
                 return {}
+
 
 async def load_data_from_github():
     """Загрузка CSV контента из GitHub"""
