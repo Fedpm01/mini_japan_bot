@@ -120,13 +120,20 @@ async def load_data_from_github():
             return data_map
 
 # --- Загрузка JLPT ---
+# --- Загрузка JLPT ---
 async def load_jlpt_data():
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
     async with aiohttp.ClientSession() as session:
         for url in JLPT_PARTS:
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    part = await resp.json()
+                    text = await resp.text()  # 🟢 вместо resp.json()
+                    try:
+                        part = json.loads(text)
+                    except json.JSONDecodeError:
+                        print(f"⚠️ Ошибка парсинга JSON: {url}")
+                        continue
+
                     for item in part:
                         level = item.get("jlpt", "")
                         if not level:
@@ -143,6 +150,9 @@ async def load_jlpt_data():
                                 },
                             })
                     print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
+                else:
+                    print(f"⚠️ Ошибка загрузки {url} ({resp.status})")
+
     print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
     return grouped
 
