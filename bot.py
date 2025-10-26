@@ -79,7 +79,7 @@ async def load_jlpt_data():
                 else:
                     print(f"⚠️ Failed to load {url} ({resp.status})")
 
-        # 2️⃣ Загружаем JLPT уровни из jlpt-kanji.json
+    # 2️⃣ Загружаем JLPT уровни из jlpt-kanji.json
         extra_url = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/jlpt-kanji.json"
         async with session.get(extra_url) as resp:
             if resp.status == 200:
@@ -87,19 +87,28 @@ async def load_jlpt_data():
                 try:
                     jlpt_kanji = json.loads(text)
                     for item in jlpt_kanji:
-                        level = item.get("jlpt", "").upper()
+                        level = item.get("jlpt")
+                        if not level:  # пропускаем пустые / None уровни
+                            continue
+                        level = str(level).upper()
+                        
                         if level in grouped:
                             grouped[level].append({
-                                "kanji": item.get("kanji"),
+                                "kanji": item.get("kanji") or "",
                                 "reading": "",
-                                "translation": {"en": item.get("description", ""), "ru": ""},
+                                "translation": {
+                                    "en": item.get("description", ""),
+                                    "ru": ""
+                                },
                             })
                     print(f"✅ Loaded {len(jlpt_kanji)} kanji from jlpt-kanji.json")
                 except json.JSONDecodeError:
                     print("⚠️ Ошибка парсинга jlpt-kanji.json")
+        
+        print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
+        return grouped
 
-    print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
-    return grouped
+          
 
     # 3️⃣ Формируем мапу {канжи: уровень}
     kanji_to_level = {k["kanji"]: k["jlpt"].upper() for k in jlpt_kanji if k.get("jlpt")}
