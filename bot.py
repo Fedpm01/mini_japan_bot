@@ -2,11 +2,6 @@
 # Mini Japan Telegram Bot (template)
 # Requirements: aiogram, APScheduler, python-dotenv
 # pip install aiogram==2.25.1 APScheduler python-dotenv
-
-#!/usr/bin/env python3
-# Mini Japan Telegram Bot (updated)
-# Requirements: aiogram (v3), aiohttp, APScheduler, python-dotenv
-
 import asyncio
 import os
 import json
@@ -42,7 +37,7 @@ data = {"words": [], "facts": [], "proverbs": []}
 jlpt_data = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
 
 # --- URL для загрузки (проверь, что файлы действительно есть в этих местах) ---
-CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/main/data.csv"
+CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/data.csv"
 JLPT_FILES = [
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
@@ -64,44 +59,56 @@ def save_subs(d):
 
 # --- Загрузка JLPT (с частями) ---
 async def load_jlpt_data():
+    """Загружает все части JLPT словаря и распределяет по уровням через jlpt-kanji.json"""
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
+    all_words = []
+
+    # 1️⃣ Загружаем все части словаря (dictionary_part_X.json)
     async with aiohttp.ClientSession() as session:
         for url in JLPT_FILES:
-            try:
-                async with session.get(url, timeout=30) as resp:
-                    if resp.status == 200:
-                        text = await resp.text()
-                        try:
-                            part = json.loads(text)
-                        except json.JSONDecodeError:
-                            print(f"⚠️ Ошибка парсинга JSON из {url}")
-                            continue
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    text = await resp.text()
+                    try:
+                        part = json.loads(text)
+                    except json.JSONDecodeError:
+                        print(f"⚠️ Ошибка парсинга JSON в {url}")
+                        continue
+                    all_words.extend(part)
+                    print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
+                else:
+                    print(f"⚠️ Failed to load {url} ({resp.status})")
 
-                        # Внутри part — список слов; у каждого есть поле "jlpt"
-                        for item in part:
-                            # пробуем несколько вариантов поля уровня
-                            level = (
-                                str(item.get("jlpt") or item.get("jlpt_level") or item.get("level") or "")
-                                .upper()
-                                .replace("JLPT", "")
-                            )
-                            if level in grouped:
-                                grouped[level].append({
-                                    "kanji": item.get("kanji") or item.get("word") or "",
-                                    "reading": item.get("reading") or item.get("kana") or "",
-                                    "translation": {
-                                        "en": item.get("meaning") or item.get("english") or "",
-                                        "ru": item.get("meaning_ru") or item.get("russian") or "",
-                                    },
-                                })
+        # 2️⃣ Загружаем JLPT уровни из jlpt-kanji.json
+        JLPT_KANJI_URL = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/jlpt-kanji.json"
+        async with session.get(JLPT_KANJI_URL) as resp:
+            if resp.status == 200:
+                jlpt_kanji = await resp.json()
+                print(f"✅ Loaded {len(jlpt_kanji)} JLPT kanji")
+            else:
+                jlpt_kanji = []
+                print(f"⚠️ Failed to load jlpt-kanji.json ({resp.status})")
 
-                        print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
-                    else:
-                        print(f"⚠️ {url} returned {resp.status}")
-            except Exception as e:
-                print(f"⚠️ Exception while loading {url}: {e}")
+    # 3️⃣ Формируем мапу {канжи: уровень}
+    kanji_to_level = {k["kanji"]: k["jlpt"].upper() for k in jlpt_kanji if k.get("jlpt")}
+
+    # 4️⃣ Распределяем слова по уровням
+    for word in all_words:
+        kanji = word.get("kanji", "")
+        level = kanji_to_level.get(kanji)
+        if level in grouped:
+            grouped[level].append({
+                "kanji": word.get("kanji"),
+                "reading": word.get("reading"),
+                "translation": {
+                    "en": " | ".join(word.get("glossary_en", [])) if isinstance(word.get("glossary_en"), list) else word.get("glossary_en", ""),
+                    "ru": " | ".join(word.get("glossary_ru", [])) if isinstance(word.get("glossary_ru"), list) else word.get("glossary_ru", ""),
+                }
+            })
+
     print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
     return grouped
+
 
 # --- Загрузка CSV контента из GitHub ---
 async def load_data_from_github():
@@ -285,20 +292,27 @@ async def main():
     global data, jlpt_data
     print("🚀 Bot starting...")
 
-    # Загрузка CSV и JLPT (делаем параллельно)
-    try:
-        data_task = asyncio.create_task(load_data_from_github())
-        jlpt_task = asyncio.create_task(load_jlpt_data())
-        data = await data_task
-        jlpt_data = await jlpt_task
-    except Exception as e:
-        print("⚠️ Error during initial load:", e)
+    # 1️⃣ Загружаем CSV
+    data = await load_data_from_github()
+    print(f"✅ CSV: {len(data['words'])} words, {len(data['facts'])} facts, {len(data['proverbs'])} proverbs")
 
-    print(f"📊 JLPT totals: { {k: len(v) for k, v in jlpt_data.items()} }")
-    print(f"✅ CSV: {len(data.get('words',[]))} words, {len(data.get('facts',[]))} facts, {len(data.get('proverbs',[]))} proverbs")
+    # 2️⃣ Загружаем JLPT (и сохраняем локально)
+    print("📚 Загрузка JLPT данных...")
+    jlpt_data = await load_jlpt_data()
 
+    # Сохраним JLPT в кэш
+    cache_path = os.path.join(os.path.dirname(__file__), "jlpt_cache.json")
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(jlpt_data, f, ensure_ascii=False, indent=2)
+    print(f"✅ JLPT данные сохранены в {cache_path}")
+
+    # 3️⃣ Запускаем планировщик
     setup_scheduler()
+
+    # 4️⃣ Только теперь запускаем бота
+    print("🤖 Bot is ready to receive updates!")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
