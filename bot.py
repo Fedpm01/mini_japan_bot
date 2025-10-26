@@ -55,7 +55,6 @@ def save_subs(d):
 
 
 # --- Загрузка данных ---
-# --- URL GitHub JSON ---
 # --- JLPT из AnchorI ---
 JLPT_FILES = [
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
@@ -71,7 +70,13 @@ async def load_jlpt_data():
         for url in JLPT_FILES:
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    part = await resp.json()
+                    text = await resp.text()  # читаем как текст
+                    try:
+                        part = json.loads(text)  # парсим вручную
+                    except json.JSONDecodeError:
+                        print(f"⚠️ Ошибка парсинга JSON в {url}")
+                        continue
+
                     for item in part:
                         level = item.get("jlpt", "").upper()
                         if level in grouped:
