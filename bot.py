@@ -37,7 +37,7 @@ data = {"words": [], "facts": [], "proverbs": []}
 jlpt_data = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
 
 # --- URL для загрузки (проверь, что файлы действительно есть в этих местах) ---
-CSV_URL = "https://raw.githubusercontent.com/Fedpm01/main/mini_japan_bot/data.csv"
+CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/main/data.csv"
 JLPT_FILES = [
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
     "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
