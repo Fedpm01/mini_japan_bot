@@ -50,8 +50,6 @@ JLPT_PARTS = [
 KANJI_URL = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/jlpt-kanji.json"
 TAGS_URL = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary-tags.json"
 
-
-
 # --- Работа с подписками ---
 def load_subs():
     try:
@@ -126,24 +124,18 @@ async def load_data_from_github():
 
 # --- Загрузка JLPT ---
 async def load_jlpt_data():
-    """Загружает все части JLPT словаря и кандзи."""
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
     async with aiohttp.ClientSession() as session:
-        # --- Загрузка словаря (4 части) ---
         for url in JLPT_PARTS:
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    text = await resp.text()
                     try:
-                        part = json.loads(text)
+                        part = json.loads(await resp.text())
                     except json.JSONDecodeError:
                         print(f"⚠️ Ошибка парсинга {url}")
                         continue
-
                     for item in part:
                         level = str(item.get("jlpt") or "").upper()
-                        if not level:
-                            continue  # пропускаем, если нет JLPT уровня
                         if level in grouped:
                             grouped[level].append({
                                 "kanji": item.get("kanji") or item.get("word") or "",
@@ -151,48 +143,31 @@ async def load_jlpt_data():
                                 "translation": {
                                     "en": item.get("glossary_en", ""),
                                     "ru": item.get("glossary_ru", "")
-                                }
+                                },
+                                "strokes": item.get("strokes", "—"),
+                                "frequency": item.get("frequency", "—")
                             })
                     print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
-                else:
-                    print(f"⚠️ Failed to load {url} ({resp.status})")
-
-        # --- Загрузка кандзи ---
         async with session.get(KANJI_URL) as resp:
             if resp.status == 200:
-                text = await resp.text()
-                try:
-                    kanji_data = json.loads(text)
-                    for item in kanji_data:
-                        level = str(item.get("jlpt") or "").upper()
-                        if level in grouped:
-                            grouped[level].append({
-                                "kanji": item.get("kanji"),
-                                "reading": "",
-                                "translation": {
-                                    "en": item.get("description", ""),
-                                    "ru": ""
-                                }
-                            })
-                    print(f"✅ Loaded {len(kanji_data)} kanji from jlpt-kanji.json")
-                except json.JSONDecodeError:
-                    print("⚠️ Ошибка парсинга jlpt-kanji.json")
-
+                kanji_data = json.loads(await resp.text())
+                for item in kanji_data:
+                    level = str(item.get("jlpt") or "").upper()
+                    if level in grouped:
+                        grouped[level].append({
+                            "kanji": item.get("kanji"),
+                            "reading": "",
+                            "translation": {
+                                "en": item.get("description", ""),
+                                "ru": ""
+                            },
+                            "strokes": item.get("strokes", "—"),
+                            "frequency": item.get("frequency", "—")
+                        })
+                print(f"✅ Loaded {len(kanji_data)} kanji from jlpt-kanji.json")
     print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
     return grouped
 
-
-# --- Форматирование ---
-def format_word(item, lang="ru"):
-    trans = item.get(lang, "")
-    return f"{item.get('emoji','')} <b>{item.get('ja')}</b> ({item.get('reading')})\n{trans}"
-
-def format_fact(item, lang="ru"):
-    return f"{item.get('emoji','')} {item.get(lang,'')}"
-
-def format_proverb(item, lang="ru"):
-    trans = item.get(lang, "")
-    return f"{item.get('emoji','')} <b>{item.get('ja')}</b> ({item.get('reading')})\n{trans}"
 
 # --- Telegram команды ---
 @dp.message(Command("start"))
@@ -211,7 +186,7 @@ async def process_lang(call: CallbackQuery):
     subs[user_id] = {"lang": lang, "subscribed": False}
     save_subs(subs)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Слово дня / Word", callback_data="word"),
+        [InlineKeyboardButton(text="Слово / Word", callback_data="word"),
          InlineKeyboardButton(text="Факт / Fact", callback_data="fact")],
         [InlineKeyboardButton(text="Пословица / Proverb", callback_data="proverb"),
          InlineKeyboardButton(text="📘 JLPT Vocabulary", callback_data="jlpt")],
@@ -233,6 +208,7 @@ async def choose_jlpt_level(call: CallbackQuery):
     await call.message.answer("Выберите уровень JLPT:", reply_markup=kb)
     await call.answer()
 
+# --- Учебные карточки JLPT ---
 @dp.callback_query(F.data.startswith("jlpt_N"))
 async def send_jlpt_word(call: CallbackQuery):
     level = call.data.split("_")[1]
@@ -240,27 +216,63 @@ async def send_jlpt_word(call: CallbackQuery):
     if not words:
         await call.message.answer("⏳ JLPT-данные ещё загружаются. Попробуйте через минуту.")
         return
+    await send_formatted_jlpt_card(call, level)
+
+@dp.callback_query(F.data.startswith("next_"))
+async def next_jlpt_word(call: CallbackQuery):
+    level = call.data.split("_")[1]
+    await send_formatted_jlpt_card(call, level, edit=True)
+
+async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool = False):
+    words = jlpt_data.get(level, [])
+    if not words:
+        await call.message.answer(f"⚠️ Нет данных для уровня {level}.")
+        return
 
     word = random.choice(words)
-    kanji = word.get("kanji", "")
-    reading = word.get("reading", "")
-    pos = word.get("pos", "")
-    en = word.get("translation", {}).get("en", "")
-    ru = word.get("translation", {}).get("ru", "")
+    kanji = word.get("kanji", "—")
+    reading = word.get("reading", "—")
     romaji = to_romaji(reading)
-    pos_full = pos_tags.get(pos, pos)
+    en = word.get("translation", {}).get("en", "—")
+    ru = word.get("translation", {}).get("ru", "(нет перевода)")
+    strokes = word.get("strokes", "—")
+    freq = word.get("frequency", "—")
+
+    examples = [
+        {"ja": f"{kanji}が好きです。", "ru": f"Мне нравится {kanji}.", "en": f"I like {kanji}."},
+        {"ja": f"{kanji}を勉強しています。", "ru": f"Я изучаю {kanji}.", "en": f"I’m studying {kanji}."},
+        {"ja": f"{kanji}は難しいですが、面白いです。", "ru": f"{kanji} сложный, но интересный.", "en": f"{kanji} is difficult but interesting."}
+    ]
+    example = random.choice(examples)
 
     text = (
         f"📘 <b>{kanji}</b>（{reading}）\n"
-        f"📖 Чтение: {reading} [{romaji}]\n"
-        f"🧩 Часть речи: {pos_full}\n"
+        f"📖 <b>Чтение:</b> {reading} [{romaji}]\n"
+        f"🈶 <b>Уровень JLPT:</b> {level}\n"
+        f"✍️ <b>Количество черт:</b> {strokes}\n"
+        f"📊 <b>Частотность:</b> {freq}\n\n"
+        f"🧩 <b>Значение:</b>\n"
         f"🇬🇧 {en}\n"
-        f"🇷🇺 {ru or '(нет перевода)'}"
+        f"🇷🇺 {ru}\n\n"
+        f"📚 <b>Пример:</b>\n"
+        f"🇯🇵 {example['ja']}\n"
+        f"🇷🇺 {example['ru']}\n"
+        f"🇬🇧 {example['en']}\n\n"
+        f"🌸 <i>Совет:</i> Используй {kanji} в своём следующем предложении!"
     )
-    await call.message.answer(text, parse_mode="HTML")
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔁 Следующее слово", callback_data=f"next_{level}")],
+        [InlineKeyboardButton(text="⬅️ Назад к уровням", callback_data="jlpt")]
+    ])
+
+    if edit:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    else:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
-# --- Рассылка и обновление ---
+# --- Ежедневная рассылка ---
 async def daily_broadcast(bot: Bot):
     subs = load_subs()
     for uid, info in subs.items():
@@ -268,7 +280,7 @@ async def daily_broadcast(bot: Bot):
             lang = info.get("lang", "ru")
             item = random.choice(data["words"])
             try:
-                await bot.send_message(int(uid), format_word(item, lang=lang), parse_mode="HTML")
+                await bot.send_message(int(uid), f"{item.get('emoji','')} {item.get(lang,'')}", parse_mode="HTML")
             except Exception as e:
                 print("Send failed to", uid, e)
 
