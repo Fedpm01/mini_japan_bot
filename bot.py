@@ -38,13 +38,17 @@ jlpt_data = {}
 pos_tags = {}
 
 # --- Источники данных ---
-CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/main/data.csv"
-JLPT_FILES = [
-    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/jlpt-kanji.json",
-    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary.json",
+# --- JLPT источники данных ---
+JLPT_PARTS = [
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_1.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_2.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_3.json",
+    "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary_part_4.json",
 ]
 
-TAGS_URL = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary-tags.json"
+JLPT_KANJI = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/jlpt-kanji.json"
+JLPT_TAGS = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary-tags.json"
+
 
 # --- Работа с подписками ---
 def load_subs():
