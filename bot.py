@@ -125,41 +125,62 @@ async def load_data_from_github():
             return data_map
 
 # --- Загрузка JLPT ---
-# --- Загрузка JLPT ---
 async def load_jlpt_data():
+    """Загружает все части JLPT словаря и кандзи."""
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
     async with aiohttp.ClientSession() as session:
+        # --- Загрузка словаря (4 части) ---
         for url in JLPT_PARTS:
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    text = await resp.text()  # 🟢 вместо resp.json()
+                    text = await resp.text()
                     try:
                         part = json.loads(text)
                     except json.JSONDecodeError:
-                        print(f"⚠️ Ошибка парсинга JSON: {url}")
+                        print(f"⚠️ Ошибка парсинга {url}")
                         continue
 
                     for item in part:
-                        level = item.get("jlpt", "")
+                        level = str(item.get("jlpt") or "").upper()
                         if not level:
-                            continue
-                        level = level.upper()
+                            continue  # пропускаем, если нет JLPT уровня
                         if level in grouped:
                             grouped[level].append({
                                 "kanji": item.get("kanji") or item.get("word") or "",
-                                "reading": item.get("reading") or "",
-                                "pos": item.get("pos") or "",
+                                "reading": item.get("reading") or item.get("kana") or "",
                                 "translation": {
                                     "en": item.get("glossary_en", ""),
-                                    "ru": item.get("glossary_ru", ""),
-                                },
+                                    "ru": item.get("glossary_ru", "")
+                                }
                             })
                     print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
                 else:
-                    print(f"⚠️ Ошибка загрузки {url} ({resp.status})")
+                    print(f"⚠️ Failed to load {url} ({resp.status})")
+
+        # --- Загрузка кандзи ---
+        async with session.get(KANJI_URL) as resp:
+            if resp.status == 200:
+                text = await resp.text()
+                try:
+                    kanji_data = json.loads(text)
+                    for item in kanji_data:
+                        level = str(item.get("jlpt") or "").upper()
+                        if level in grouped:
+                            grouped[level].append({
+                                "kanji": item.get("kanji"),
+                                "reading": "",
+                                "translation": {
+                                    "en": item.get("description", ""),
+                                    "ru": ""
+                                }
+                            })
+                    print(f"✅ Loaded {len(kanji_data)} kanji from jlpt-kanji.json")
+                except json.JSONDecodeError:
+                    print("⚠️ Ошибка парсинга jlpt-kanji.json")
 
     print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
     return grouped
+
 
 # --- Форматирование ---
 def format_word(item, lang="ru"):
