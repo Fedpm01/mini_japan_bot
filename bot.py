@@ -48,6 +48,7 @@ JLPT_PARTS = [
 
 JLPT_KANJI = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/jlpt-kanji.json"
 JLPT_TAGS = "https://raw.githubusercontent.com/AnchorI/jlpt-kanji-dictionary/main/dictionary-tags.json"
+CSV_URL = "https://raw.githubusercontent.com/ТВОЙ_GITHUB_USERNAME/mini_japan_bot/main/data.csv"
 
 
 # --- Работа с подписками ---
