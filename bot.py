@@ -88,10 +88,47 @@ HIRAGANA_ROMAJI = {
     "りゃ": "rya", "りゅ": "ryu", "りょ": "ryo",
 }
 def to_romaji(kana: str) -> str:
+    # Заменяем более длинные ключи первыми, чтобы 'きゃ' не превратилось в 'ki'+'ya'
     romaji = kana
-    for k, v in HIRAGANA_ROMAJI.items():
-        romaji = romaji.replace(k, v)
+    # Сортируем ключи по длине убыванию
+    for k in sorted(HIRAGANA_ROMAJI.keys(), key=lambda x: -len(x)):
+        romaji = romaji.replace(k, HIRAGANA_ROMAJI[k])
     return romaji
+
+# --- DeepL переводчик с простым in-memory кэшем ---
+_translation_cache = {}
+
+async def deepl_translate(text: str, target_lang: str = "RU") -> str:
+    """Переводит текст через DeepL API (если ключ есть). Возвращает пустую строку при ошибке."""
+    if not text or not DEEPL_API_KEY:
+        return ""
+    key = (text, target_lang)
+    if key in _translation_cache:
+        return _translation_cache[key]
+
+    url = "https://api-free.deepl.com/v2/translate"
+    params = {
+        "auth_key": DEEPL_API_KEY,
+        "text": text,
+        "target_lang": target_lang,
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=params, timeout=10) as resp:
+                if resp.status != 200:
+                    print("⚠️ DeepL returned status", resp.status)
+                    return ""
+                data = await resp.json()
+                if "translations" in data and len(data["translations"]) > 0:
+                    out = data["translations"][0]["text"]
+                    _translation_cache[key] = out
+                    return out
+    except Exception as e:
+        print("⚠️ DeepL translation error:", e)
+    return ""
+
+
+
 
 # --- Загрузка POS-тегов ---
 async def load_pos_tags():
@@ -122,51 +159,80 @@ async def load_data_from_github():
                     data_map["words"].append(row)
             return data_map
 
-# --- Загрузка JLPT ---
+# --- Загрузка JLPT (с автопереводом через DeepL) ---
 async def load_jlpt_data():
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
     async with aiohttp.ClientSession() as session:
         for url in JLPT_PARTS:
             async with session.get(url) as resp:
                 if resp.status == 200:
+                    text = await resp.text()
                     try:
-                        part = json.loads(await resp.text())
+                        part = json.loads(text)
                     except json.JSONDecodeError:
                         print(f"⚠️ Ошибка парсинга {url}")
                         continue
+
                     for item in part:
                         level = str(item.get("jlpt") or "").upper()
-                        if level in grouped:
-                            grouped[level].append({
-                                "kanji": item.get("kanji") or item.get("word") or "",
-                                "reading": item.get("reading") or item.get("kana") or "",
-                                "translation": {
-                                    "en": item.get("glossary_en", ""),
-                                    "ru": item.get("glossary_ru", "")
-                                },
-                                "strokes": item.get("strokes", "—"),
-                                "frequency": item.get("frequency", "—")
-                            })
-                    print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
-        async with session.get(KANJI_URL) as resp:
-            if resp.status == 200:
-                kanji_data = json.loads(await resp.text())
-                for item in kanji_data:
-                    level = str(item.get("jlpt") or "").upper()
-                    if level in grouped:
+                        if not level or level not in grouped:
+                            continue
+
+                        # English meaning
+                        en_val = item.get("glossary_en") or item.get("glossary") or ""
+                        if isinstance(en_val, list):
+                            en_text = "; ".join(str(x) for x in en_val)
+                        else:
+                            en_text = str(en_val)
+
+                        # Russian if present
+                        ru_val = item.get("glossary_ru", "")
+                        if isinstance(ru_val, list):
+                            ru_text = "; ".join(str(x) for x in ru_val)
+                        else:
+                            ru_text = str(ru_val or "")
+
+                        # if no ru — translate
+                        if not ru_text.strip() and en_text.strip():
+                            ru_text = await deepl_translate(en_text)
+
                         grouped[level].append({
-                            "kanji": item.get("kanji"),
-                            "reading": "",
-                            "translation": {
-                                "en": item.get("description", ""),
-                                "ru": ""
-                            },
+                            "kanji": item.get("kanji") or item.get("word") or "",
+                            "reading": item.get("reading") or item.get("kana") or "",
+                            "translation": {"en": en_text, "ru": ru_text},
+                            "pos": item.get("pos", ""),
                             "strokes": item.get("strokes", "—"),
                             "frequency": item.get("frequency", "—")
                         })
-                print(f"✅ Loaded {len(kanji_data)} kanji from jlpt-kanji.json")
+                    print(f"✅ Loaded {len(part)} items from {url.split('/')[-1]}")
+                else:
+                    print(f"⚠️ Failed to load {url} ({resp.status})")
+
+        # kanji file
+        async with session.get(KANJI_URL) as resp:
+            if resp.status == 200:
+                text = await resp.text()
+                try:
+                    kanji_data = json.loads(text)
+                    for item in kanji_data:
+                        level = str(item.get("jlpt") or "").upper()
+                        if level in grouped:
+                            en_desc = item.get("description", "")
+                            ru_desc = await deepl_translate(en_desc) if en_desc else ""
+                            grouped[level].append({
+                                "kanji": item.get("kanji"),
+                                "reading": item.get("reading", "") or "",
+                                "translation": {"en": en_desc, "ru": ru_desc},
+                                "strokes": item.get("strokes", "—"),
+                                "frequency": item.get("frequency", "—")
+                            })
+                    print(f"✅ Loaded {len(kanji_data)} kanji from jlpt-kanji.json")
+                except json.JSONDecodeError:
+                    print("⚠️ Ошибка парсинга jlpt-kanji.json")
+
     print("📊 JLPT totals:", {k: len(v) for k, v in grouped.items()})
     return grouped
+
 
 
 # --- Telegram команды ---
@@ -186,7 +252,7 @@ async def process_lang(call: CallbackQuery):
     subs[user_id] = {"lang": lang, "subscribed": False}
     save_subs(subs)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Слово / Word", callback_data="word"),
+        [InlineKeyboardButton(text="Слово / Word", callback_data="daily"),
          InlineKeyboardButton(text="Факт / Fact", callback_data="fact")],
         [InlineKeyboardButton(text="Пословица / Proverb", callback_data="proverb"),
          InlineKeyboardButton(text="📘 JLPT Vocabulary", callback_data="jlpt")],
@@ -237,6 +303,9 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
     ru = word.get("translation", {}).get("ru", "(нет перевода)")
     strokes = word.get("strokes", "—")
     freq = word.get("frequency", "—")
+    pos_code = word.get("pos", "") or ""
+    pos_full = pos_tags.get(pos_code, pos_code) if pos_tags else pos_code
+
 
     examples = [
         {"ja": f"{kanji}が好きです。", "ru": f"Мне нравится {kanji}.", "en": f"I like {kanji}."},
@@ -251,7 +320,7 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
         f"🈶 <b>Уровень JLPT:</b> {level}\n"
         f"✍️ <b>Количество черт:</b> {strokes}\n"
         f"📊 <b>Частотность:</b> {freq}\n\n"
-        f"🧩 <b>Значение:</b>\n"
+        f"🧩 <b>Часть речи:</b> {pos_full}\n"
         f"🇬🇧 {en}\n"
         f"🇷🇺 {ru}\n\n"
         f"📚 <b>Пример:</b>\n"
@@ -273,12 +342,14 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
     await call.answer()
 
 # --- Ежедневная рассылка ---
-async def daily_broadcast(bot: Bot):
+async def daily_broadcast(bot):
     subs = load_subs()
     for uid, info in subs.items():
         if info.get("subscribed"):
             lang = info.get("lang", "ru")
-            item = random.choice(data["words"])
+            item = random.choice(data["words"]) if data["words"] else None
+            if not item:
+                continue
             try:
                 await bot.send_message(int(uid), f"{item.get('emoji','')} {item.get(lang,'')}", parse_mode="HTML")
             except Exception as e:
@@ -291,10 +362,13 @@ async def refresh_data():
     print("✅ Data updated!")
 
 def setup_scheduler():
-    scheduler.add_job(lambda: asyncio.create_task(daily_broadcast(bot)), "cron", hour=9)
-    scheduler.add_job(lambda: asyncio.create_task(refresh_data()), "cron", hour=6)
+    # Для AsyncIOScheduler можно передать coroutine в add_job — он выполнится в loop
+    # Запускаем ежедневную рассылку и обновление данных
+    scheduler.add_job(daily_broadcast, "cron", hour=9, args=[bot], id="daily_broadcast")
+    scheduler.add_job(refresh_data, "cron", hour=6, id="refresh_data")
     scheduler.start()
     print("✅ Scheduler started!")
+
 
 # --- Главная функция ---
 async def main():
