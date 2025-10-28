@@ -310,21 +310,38 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
 
     word = random.choice(words)
     kanji = word.get("kanji", "—")
-    reading = word.get("reading", "—")
+    reading = word.get("reading") or word.get("kana") or "—"
+    if isinstance(reading, list):
+        reading = ", ".join(reading)
     romaji = to_romaji(reading)
-    en = word.get("translation", {}).get("en", "—")
-    ru = word.get("translation", {}).get("ru", "(нет перевода)")
+    en = word.get("translation", {}).get("en", "—").strip()
+    ru = word.get("translation", {}).get("ru", "").strip() or "(нет перевода)"
     strokes = word.get("strokes", "—")
     freq = word.get("frequency", "—")
     pos_code = word.get("pos", "") or ""
     pos_full = pos_tags.get(pos_code, pos_code) if pos_tags else pos_code
 
+    # --- Формирование естественного примера ---
+    pos = pos_full.lower()
+    examples = []
 
-    examples = [
-        {"ja": f"{kanji}が好きです。", "ru": f"Мне нравится {kanji}.", "en": f"I like {kanji}."},
-        {"ja": f"{kanji}を勉強しています。", "ru": f"Я изучаю {kanji}.", "en": f"I’m studying {kanji}."},
-        {"ja": f"{kanji}は難しいですが、面白いです。", "ru": f"{kanji} сложный, но интересный.", "en": f"{kanji} is difficult but interesting."}
-    ]
+    if "verb" in pos:  # глагол
+        examples = [
+            {"ja": f"毎日{kanji}ます。", "ru": f"Я {ru.lower()} каждый день.", "en": f"I {en} every day."},
+            {"ja": f"{kanji}ことが好きです。", "ru": f"Мне нравится {ru.lower()}.", "en": f"I like to {en}."},
+        ]
+    elif "adj" in pos or "adjective" in pos:  # прилагательное
+        examples = [
+            {"ja": f"この人はとても{kanji}です。", "ru": f"Этот человек очень {ru.lower()}.", "en": f"This person is very {en}."},
+            {"ja": f"{kanji}ですね。", "ru": f"Ты {ru.lower()}, правда?", "en": f"You're {en}, aren't you?"},
+        ]
+    else:  # существительное
+        examples = [
+            {"ja": f"{kanji}が大切です。", "ru": f"{ru.capitalize()} очень важно.", "en": f"{en.capitalize()} is important."},
+            {"ja": f"{kanji}を持っています。", "ru": f"У меня есть {ru.lower()}.", "en": f"I have {en.lower()}."},
+            {"ja": f"{kanji}について話しましょう。", "ru": f"Давай поговорим о {ru.lower()}.", "en": f"Let's talk about {en.lower()}."},
+        ]
+
     example = random.choice(examples)
 
     text = (
@@ -340,7 +357,7 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
         f"🇯🇵 {example['ja']}\n"
         f"🇷🇺 {example['ru']}\n"
         f"🇬🇧 {example['en']}\n\n"
-        f"🌸 <i>Совет:</i> Используй {kanji} в своём следующем предложении!"
+        f"🌸 <i>Совет:</i> Используй <b>{kanji}</b> в своём следующем предложении!"
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
