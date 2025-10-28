@@ -95,37 +95,47 @@ def to_romaji(kana: str) -> str:
         romaji = romaji.replace(k, HIRAGANA_ROMAJI[k])
     return romaji
 
-# --- DeepL переводчик ---
+# --- DeepL переводчик и кэш ---
 DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
+TRANSLATION_CACHE_PATH = os.path.join(os.path.dirname(__file__), "translation_cache.json")
 
-# --- DeepL переводчик с простым in-memory кэшем ---
-_translation_cache = {}
+def load_cache():
+    try:
+        with open(TRANSLATION_CACHE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_cache(cache):
+    with open(TRANSLATION_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
+
+translation_cache = load_cache()
 
 async def deepl_translate(text: str, target_lang: str = "RU") -> str:
-    """Переводит текст через DeepL API (если ключ есть). Возвращает пустую строку при ошибке."""
-    if not text or not DEEPL_API_KEY:
+    """Переводит текст через DeepL API с локальным кэшем."""
+    if not text:
         return ""
-    key = (text, target_lang)
-    if key in _translation_cache:
-        return _translation_cache[key]
+    if text in translation_cache:
+        return translation_cache[text]
+
+    if not DEEPL_API_KEY:
+        print("⚠️ DeepL API key not set, skipping translation")
+        return ""
 
     url = "https://api-free.deepl.com/v2/translate"
-    params = {
-        "auth_key": DEEPL_API_KEY,
-        "text": text,
-        "target_lang": target_lang,
-    }
+    params = {"auth_key": DEEPL_API_KEY, "text": text, "target_lang": target_lang}
+
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=params, timeout=10) as resp:
-                if resp.status != 200:
-                    print("⚠️ DeepL returned status", resp.status)
-                    return ""
+            async with session.post(url, data=params) as resp:
                 data = await resp.json()
-                if "translations" in data and len(data["translations"]) > 0:
-                    out = data["translations"][0]["text"]
-                    _translation_cache[key] = out
-                    return out
+                if "translations" in data:
+                    translated = data["translations"][0]["text"]
+                    translation_cache[text] = translated
+                    save_cache(translation_cache)
+                    print(f"💾 Cached translation: {text[:25]} → {translated[:25]}")
+                    return translated
     except Exception as e:
         print("⚠️ DeepL translation error:", e)
     return ""
