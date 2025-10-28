@@ -95,6 +95,9 @@ def to_romaji(kana: str) -> str:
         romaji = romaji.replace(k, HIRAGANA_ROMAJI[k])
     return romaji
 
+# --- DeepL переводчик ---
+DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
+
 # --- DeepL переводчик с простым in-memory кэшем ---
 _translation_cache = {}
 
