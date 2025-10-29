@@ -36,6 +36,7 @@ SUBS_PATH = os.path.join(os.path.dirname(__file__), "subscribers.json")
 data = {"words": [], "facts": [], "proverbs": []}
 jlpt_data = {}
 pos_tags = {}
+kanji_readings = {}
 
 # --- Источники данных ---
 CSV_URL = "https://raw.githubusercontent.com/Fedpm01/mini_japan_bot/main/data.csv"
@@ -172,6 +173,20 @@ async def load_data_from_github():
                     data_map["words"].append(row)
             return data_map
 
+# --- Загрузка чтений из kanji_readings.json ---
+def load_kanji_readings():
+    path = os.path.join(os.path.dirname(__file__), "kanji_readings.json")
+    if not os.path.exists(path):
+        print("⚠️ kanji_readings.json не найден — чтения не будут добавлены.")
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print("⚠️ Ошибка чтения kanji_readings.json:", e)
+        return {}
+
+
 # --- Загрузка JLPT (с автопереводом через DeepL) ---
 async def load_jlpt_data():
     grouped = {"N5": [], "N4": [], "N3": [], "N2": [], "N1": []}
@@ -307,10 +322,16 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
     if not words:
         await call.message.answer(f"⚠️ Нет данных для уровня {level}.")
         return
+    
 
     word = random.choice(words)
     kanji = word.get("kanji", "—")
     reading = word.get("reading") or word.get("kana") or "—"
+    # Если чтения отсутствуют — подгружаем из kanji_readings.json
+    if (not reading or reading == "—") and kanji in kanji_readings:
+        readings = kanji_readings[kanji]
+        all_readings = readings.get("on", []) + readings.get("kun", [])
+        reading = ", ".join(all_readings) if all_readings else "—"
     if isinstance(reading, list):
         reading = ", ".join(reading)
     romaji = to_romaji(reading)
@@ -321,25 +342,35 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
     pos_code = word.get("pos", "") or ""
     pos_full = pos_tags.get(pos_code, pos_code) if pos_tags else pos_code
 
+    if " " in ru:
+    ru_main = ru.split(" ")[0]
+    else:
+        ru_main = ru
+    if " " in en:
+        en_main = en.split(" ")[0]
+    else:
+        en_main = en
+
+
     # --- Формирование естественного примера ---
     pos = pos_full.lower()
     examples = []
 
     if "verb" in pos:  # глагол
         examples = [
-            {"ja": f"毎日{kanji}ます。", "ru": f"Я {ru.lower()} каждый день.", "en": f"I {en} every day."},
-            {"ja": f"{kanji}ことが好きです。", "ru": f"Мне нравится {ru.lower()}.", "en": f"I like to {en}."},
+            {"ja": f"毎日{kanji}ます。", "ru_main": f"Я {ru.lower()} каждый день.", "en_main": f"I {en} every day."},
+            {"ja": f"{kanji}ことが好きです。", "ru_main": f"Мне нравится {ru.lower()}.", "en_main": f"I like to {en}."},
         ]
     elif "adj" in pos or "adjective" in pos:  # прилагательное
         examples = [
-            {"ja": f"この人はとても{kanji}です。", "ru": f"Этот человек очень {ru.lower()}.", "en": f"This person is very {en}."},
-            {"ja": f"{kanji}ですね。", "ru": f"Ты {ru.lower()}, правда?", "en": f"You're {en}, aren't you?"},
+            {"ja": f"この人はとても{kanji}です。", "ru_main": f"Этот человек очень {ru.lower()}.", "en_main": f"This person is very {en}."},
+            {"ja": f"{kanji}ですね。", "ru_main": f"Ты {ru.lower()}, правда?", "en_main": f"You're {en}, aren't you?"},
         ]
     else:  # существительное
         examples = [
-            {"ja": f"{kanji}が大切です。", "ru": f"{ru.capitalize()} очень важно.", "en": f"{en.capitalize()} is important."},
-            {"ja": f"{kanji}を持っています。", "ru": f"У меня есть {ru.lower()}.", "en": f"I have {en.lower()}."},
-            {"ja": f"{kanji}について話しましょう。", "ru": f"Давай поговорим о {ru.lower()}.", "en": f"Let's talk about {en.lower()}."},
+            {"ja": f"{kanji}が大切です。", "ru_main": f"{ru.capitalize()} очень важно.", "en_main": f"{en.capitalize()} is important."},
+            {"ja": f"{kanji}を持っています。", "ru_main": f"У меня есть {ru.lower()}.", "en_main": f"I have {en.lower()}."},
+            {"ja": f"{kanji}について話しましょう。", "ru_main": f"Давай поговорим о {ru.lower()}.", "en_main": f"Let's talk about {en.lower()}."},
         ]
 
     example = random.choice(examples)
@@ -402,10 +433,12 @@ def setup_scheduler():
 
 # --- Главная функция ---
 async def main():
-    global data, jlpt_data, pos_tags
+    global data, jlpt_data, pos_tags, kanji_readings
     print("🚀 Bot starting...")
     data = await load_data_from_github()
     jlpt_data = await load_jlpt_data()
+    kanji_readings = load_kanji_readings()
+    print(f"✅ Kanji readings loaded: {len(kanji_readings)} items")
     pos_tags = await load_pos_tags()
     print("✅ POS tags loaded!")
     print(f"✅ CSV: {len(data['words'])} words, {len(data['facts'])} facts, {len(data['proverbs'])} proverbs")
