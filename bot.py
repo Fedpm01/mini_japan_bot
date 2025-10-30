@@ -343,7 +343,7 @@ async def send_formatted_jlpt_card(call: CallbackQuery, level: str, edit: bool =
     pos_full = pos_tags.get(pos_code, pos_code) if pos_tags else pos_code
 
     if " " in ru:
-    ru_main = ru.split(" ")[0]
+        ru_main = ru.split(" ")[0]
     else:
         ru_main = ru
     if " " in en:
